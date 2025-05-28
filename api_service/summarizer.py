@@ -6,7 +6,7 @@ from common.config import Config
 from common.models import Anomaly
 
 # from langchain_openai import ChatOpenAI
-from langchain_community.llms import Ollama
+from langchain_ollama import ChatOllama
 from langchain.prompts import PromptTemplate
 
 
@@ -20,13 +20,13 @@ class LLMSummarizer:
         # Initialize the Ollama LLM client
         self.ollama_base_url = f"http://{Config.OLLAMA_HOST}:{Config.OLLAMA_PORT}"
         try:
-            self.llm = Ollama(
+            self.llm = ChatOllama(
                 base_url=self.ollama_base_url,
                 model=Config.LLM_MODEL_NAME,
                 temperature=Config.LLM_TEMPERATURE,
                 num_predict=Config.LLM_MAX_NEW_TOKENS,
             )
-            self.status_llm = Ollama(
+            self.status_llm = ChatOllama(
                 base_url=self.ollama_base_url,
                 model=Config.LLM_MODEL_NAME,
                 temperature=0.1,
@@ -109,9 +109,7 @@ class LLMSummarizer:
         try:
             # Invoke the LLM chain asynchronously
             response = await self.llm_chain.ainvoke({"anomalies_data": anomalies_str})
-            summary = (
-                response.strip()
-            )  # For LCEL, .ainvoke directly returns the string output
+            summary = response.content.strip()
 
             # Check if summary is empty or only whitespace
             if not summary:
@@ -132,7 +130,7 @@ class LLMSummarizer:
 
         try:
             response = await self.status_chain.ainvoke({})
-            cleaned_response = str(response).strip().upper()
+            cleaned_response = response.content.strip().upper()
             if "Y" in cleaned_response:
                 print("LLM status check successful: Received 'Y'.")
                 return True, "Y"

@@ -97,7 +97,7 @@ The system integrates a Large Language Model (LLM) for summarizing detected anom
   * **Framework:** [LangChain](https://www.langchain.com/) is employed within the `LLMSummarizer` class to interact with Ollama. LangChain simplifies the process of building LLM-powered applications by providing abstractions for prompts, chains, and model interactions.
   * **`LLMSummarizer` Class:**
       * Located in `llm_summarizer/summarizer.py`.
-      * Initializes an `Ollama` client and a `PromptTemplate`.
+      * Initializes a `ChatOllama` client and a `PromptTemplate`.
       * The `PromptTemplate` is designed to instruct the LLM to analyze a list of anomalies and provide a concise summary, focusing on important events and their impact.
       * The `generate_summary` method takes a list of `Anomaly` objects, formats them into a string, and sends them to the LLM via a LangChain `LLMChain` for summarization.
   * **Integration in API Service:**
