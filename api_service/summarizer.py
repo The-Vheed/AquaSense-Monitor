@@ -5,6 +5,7 @@ from typing import List
 from common.config import Config
 from common.models import Anomaly
 
+# from langchain_openai import ChatOpenAI
 from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 
@@ -31,6 +32,18 @@ class LLMSummarizer:
                 temperature=0.1,
                 num_predict=2,
             )
+
+            # OpenAI used for speedy debugging
+            # self.llm = ChatOpenAI(
+            #     model="gpt-4o-mini",  # Use a specific model for ChatOpenAI
+            #     temperature=Config.LLM_TEMPERATURE,
+            #     max_completion_tokens=Config.LLM_MAX_NEW_TOKENS,
+            # )
+            # self.status_llm = ChatOpenAI(
+            #     model="gpt-4o-mini",  # Use a specific model for ChatOpenAI
+            #     max_completion_tokens=2,
+            # )
+
             print(
                 f"LLM Summarizer: Successfully connected to Ollama at {self.ollama_base_url}"
             )
