@@ -1,0 +1,31 @@
+graph TD
+    subgraph Services
+        SS[Sensor Simulator]
+        AD[Anomaly Detector]
+        AP[API Service]
+        OL[Ollama LLM Server]
+    end
+
+    subgraph Data Persistence
+        SD((Shared Data Volume))
+        MV((Models Volume))
+    end
+
+    direction LR
+
+    %% Main Data Flows
+    SS -- Sensor Readings --> AD
+    AP -- Request Anomalies --> AD
+    AP -- Request Summary --> OL
+    OL -- LLM Response --> AP
+
+    %% Data Storage
+    AD -- Stores Anomalies --> SD
+    OL -- Uses Models --> MV
+
+    style SS fill:#add8e6,stroke:#007bff,stroke-width:2px
+    style AD fill:#fffacd,stroke:#ffc107,stroke-width:2px
+    style AP fill:#f8d7da,stroke:#dc3545,stroke-width:2px
+    style OL fill:#d4edda,stroke:#28a745,stroke-width:2px
+    style SD fill:#e9ecef,stroke:#6c757d,stroke-width:2px
+    style MV fill:#e9ecef,stroke:#6c757d,stroke-width:2px

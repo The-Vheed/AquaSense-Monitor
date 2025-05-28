@@ -1,0 +1,84 @@
+# docker-compose.yml
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aqua-sense-ollama
+    ports:
+      - "11434:11434" # Expose Ollama port for potential direct host interaction
+    volumes:
+      - ./models:/root/.ollama # Persist Ollama models
+      - ./ollama_entrypoint.sh:/ollama_entrypoint.sh # Custom entrypoint script
+    # Command to pull the mistral model on startup, then serve Ollama
+    entrypoint: ["/usr/bin/bash", "/ollama_entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:11434"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aqua_network
+
+  anomaly_detector:
+    build:
+      context: .
+      dockerfile: anomaly_detector/Dockerfile
+    container_name: aqua-sense-anomaly-detector
+    ports:
+      - "8001:8001" # Expose for potential debugging/direct access
+    volumes:
+      - ./data:/app/data # Shared volume for anomalies.json (still used for persistence)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:8001/status"] # Check if FastAPI docs are up
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aqua_network
+
+  sensor_simulator:
+    build:
+      context: .
+      dockerfile: sensor_simulator/Dockerfile
+    container_name: aqua-sense-sensor-simulator
+    ports:
+      - "8002:8002" # Expose sensor simulator's API port (8000 inside container, 8002 on host)
+    depends_on:
+      anomaly_detector:
+        condition: service_healthy # Wait for detector to be ready
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:8002/status"] # Check if FastAPI status is up
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aqua_network
+
+  api_service:
+    build:
+      context: .
+      dockerfile: api_service/Dockerfile
+    container_name: aqua-sense-api-service
+    ports:
+      - "8000:8000" # Expose public API port
+    depends_on:
+      anomaly_detector:
+        condition: service_healthy # Depends on detector for fetching anomalies
+      ollama:
+        condition: service_healthy # Depends on Ollama for LLM functionality
+    volumes:
+      - ./data:/app/data # Shared volume to read summary.json (if still used for persistence)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:8000/status"] # Check if FastAPI status is up
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aqua_network
+
+networks:
+  aqua_network:
+    driver: bridge
+
+volumes:
+  data: # Define a named volume for shared data
+  models: # Define a named volume for Ollama models
