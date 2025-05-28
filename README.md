@@ -19,10 +19,49 @@ AquaSense-Monitor is a microservices-based system designed to simulate, detect, 
 
 The AquaSense-Monitor system comprises several interconnected services orchestrated by Docker Compose:
 
-  * **Sensor Simulator:** Generates synthetic water quality sensor data (temperature, pressure, flow) and periodically introduces various anomalies (spikes, drifts, dropouts).
-  * **Anomaly Detector:** Receives sensor readings, applies basic threshold-based anomaly detection, and stores detected anomalies.
-  * **Ollama LLM Server:** Hosts and serves the Large Language Model (Mistral), which is used for generating human-readable summaries of anomalies.
-  * **API Service:** The central public-facing API. It fetches real-time anomalies from the Anomaly Detector, integrates the LLM summarizer to provide on-demand summaries, and exposes a comprehensive system health status.
+### I. Services
+
+* **Sensor Simulator:**
+    * **Role:** This service acts as the data source, generating synthetic sensor readings for water quality parameters such as temperature, pressure, and flow. It's crucial for testing and demonstrating the system without requiring physical sensors.
+    * **Anomaly Injection:** A key feature is its ability to periodically inject various types of anomalies (e.g., sudden "spikes" in readings, gradual "drifts" over time, or "dropouts" where data transmission is intentionally skipped) based on predefined thresholds in `common/config.py`. This ensures comprehensive testing of the anomaly detection capabilities.
+    * **Interface:** It runs its own FastAPI server and exposes a `/status` endpoint, allowing other services (like the API Service) to verify its operational health.
+    * **Communication:** Pushes `SensorReading` data (JSON payload) via HTTP POST requests to the Anomaly Detector's `/data` endpoint.
+
+* **Anomaly Detector:**
+    * **Role:** This is the primary processing unit for incoming sensor data. It receives the continuous stream of readings from the Sensor Simulator.
+    * **Detection Logic:** While the specific anomaly detection algorithms are abstracted, its core function is to apply predefined rules and thresholds (from `common/config.py`) to identify deviations from normal operating parameters.
+    * **Anomaly Storage:** Upon detecting an anomaly, it stores the `Anomaly` details (timestamp, type, sensor ID, parameter, value, message) for historical record. This data is persisted in `anomalies.json` within the shared `data` Docker volume.
+    * **Interface:** It also operates a FastAPI server, exposing an `/anomalies` endpoint that allows other services to retrieve the most up-to-date list of detected anomalies. Its `/status` endpoint (or `/anomalies` itself) serves for health checks.
+
+* **Ollama LLM Server:**
+    * **Role:** This service is the intelligent backend for natural language processing. It hosts and serves Large Language Models (LLMs), specifically the `mistral` model, which is used for generating human-readable summaries.
+    * **Model Management:** Orchestrated by Docker Compose, it automatically pulls the `mistral` model upon startup, ensuring the necessary AI capabilities are available. Models are persisted across container restarts using a dedicated `models` Docker volume.
+    * **Interface:** It exposes its standard Ollama API port (11434), allowing client libraries (like LangChain) to send inference requests and receive model responses.
+
+* **API Service:**
+    * **Role:** This is the central public-facing gateway of the entire AquaSense-Monitor system. It consolidates functionalities and provides a unified interface for external applications or users.
+    * **Anomaly Retrieval:** It directly fetches the latest anomalies from the Anomaly Detector via its `/anomalies` endpoint when requested by its own `/anomalies` endpoint or when preparing data for summarization.
+    * **Integrated LLM Summarizer:** It incorporates the `LLMSummarizer` class (built with LangChain) internally. This class handles the communication with the Ollama server, crafting prompts from anomaly data and parsing the LLM's natural language responses.
+    * **On-Demand Summarization:** It offers a `/summary` endpoint where users can request a summary of anomalies. This is based on the most recent anomalies fetched from the Anomaly Detector. The generated summary is returned directly to the client.
+    * **Comprehensive Health Status:** A critical aspect is its `/status` endpoint, which provides a holistic health overview of the entire system. It actively pings the `/status` or relevant endpoints of the Sensor Simulator, Anomaly Detector, and Ollama (including checks for model loading) to determine their real-time operational status.
+    * **Interface:** It runs a FastAPI server, exposing all public API endpoints and interactive Swagger UI documentation (`/docs`).
+
+### II. Key Interactions and Data Flow:
+
+1.  **Sensor Data Stream:** The `Sensor Simulator` continuously pushes simulated `SensorReading` data to the `Anomaly Detector`.
+2.  **Anomaly Data Access:** The `API Service` pulls the latest `Anomaly` data from the `Anomaly Detector` as needed.
+3.  **LLM Inference:** The `API Service` (specifically, its integrated `LLMSummarizer`) sends requests containing anomaly details to the `Ollama LLM Server` for summarization, receiving a concise text summary in return.
+4.  **System Health Monitoring:** The `API Service` periodically queries the health endpoints of the `Sensor Simulator`, `Anomaly Detector`, and `Ollama LLM Server` to compile a comprehensive system health report.
+5.  **Shared Persistence:** The `data` Docker volume facilitates persistent storage of `anomalies.json` (written by Anomaly Detector). The `models` volume ensures Ollama's LLM models are retained.
+
+### III. Architectural Advantages:
+
+This microservices approach, orchestrated by **Docker Compose**, provides several benefits:
+* **Modularity:** Each service is self-contained, making development, testing, and maintenance simpler.
+* **Scalability:** Individual services can be scaled independently based on their load requirements.
+* **Resilience:** The failure of one service is less likely to bring down the entire system. Health checks and dependencies help manage service readiness.
+* **Technology Diversity:** While currently all Python, this architecture allows different services to use different technologies if needed.
+* **Clear APIs:** Well-defined HTTP APIs facilitate communication and integration between services.
 
 ## 2\. Software Architecture Diagram
 
