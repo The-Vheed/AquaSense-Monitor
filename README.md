@@ -73,8 +73,15 @@ Below is the architecture diagram showing the interactions between services:
 
 Before you begin, ensure you have the following installed:
 
-  * **Docker Desktop:** Includes Docker Engine and Docker Compose.
-      * [Download Docker Desktop](https://www.docker.com/products/docker-desktop/)
+* **For Windows and macOS Users:**
+    * **Docker Desktop:** Includes Docker Engine and Docker Compose.
+        * [Download Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+* **For Linux Users:**
+    * **Docker Engine:** The core Docker daemon.
+        * Follow the official installation guide for your specific Linux distribution: [Get Docker Engine](https://docs.docker.com/engine/install/)
+    * **Docker Compose:** A tool for defining and running multi-container Docker applications.
+        * Follow the official installation guide: [Install Docker Compose](https://docs.docker.com/compose/install/)
 
 **Steps:**
 
