@@ -124,14 +124,11 @@ Before you begin, ensure you have the following installed:
 
 The anomaly detection in this system is primarily rule-based, defined by thresholds configured in `common/config.py`. The `Sensor Simulator` also uses these thresholds to inject specific anomaly types for testing.
 
-  * **`Config.TEMP_NORMAL_MIN` / `Config.TEMP_NORMAL_MAX`**: Normal operating range for temperature.
-  * **`Config.PRESSURE_NORMAL_MIN` / `Config.PRESSURE_NORMAL_MAX`**: Normal operating range for pressure.
-  * **`Config.FLOW_NORMAL_MIN` / `Config.FLOW_NORMAL_MAX`**: Normal operating range for flow.
-  * **`Config.TEMP_SPIKE_THRESHOLD_HIGH` / `LOW`**: Thresholds for sudden, sharp deviations in temperature.
-  * **`Config.PRESSURE_SPIKE_THRESHOLD_HIGH` / `LOW`**: Thresholds for sudden, sharp deviations in pressure.
-  * **`Config.FLOW_SPIKE_THRESHOLD_HIGH` / `LOW`**: Thresholds for sudden, sharp deviations in flow.
-  * **`Config.DRIFT_CONSECUTIVE_READINGS`**: Number of consecutive readings exceeding a threshold to be considered a "drift" anomaly (sustained deviation).
-  * **`Config.DROPOUT_THRESHOLD_SECONDS`**: Time duration after which a lack of readings is considered a "dropout" anomaly.
+  * **`Config.TEMP_NORMAL_MIN` / `Config.TEMP_NORMAL_MAX`**: Normal operating range for temperature (Default: 10.0 / 35.0).
+  * **`Config.PRESSURE_NORMAL_MIN` / `Config.PRESSURE_NORMAL_MAX`**: Normal operating range for pressure (Default: 20.0 / 10.0).
+  * **`Config.FLOW_NORMAL_MIN` / `Config.FLOW_NORMAL_MAX`**: Normal operating range for flow (Default: 1.0 / 3.0).
+  * **`Config.DRIFT_CONSECUTIVE_READINGS`**: Number of consecutive readings exceeding a threshold to be considered a "drift" anomaly (sustained deviation) (Default: 8 <16 seconds of sustained deviation>).
+  * **`Config.DROPOUT_THRESHOLD_SECONDS`**: Time duration after which a lack of readings is considered a "dropout" anomaly (Default: 10).
 
 These thresholds are used by the `Anomaly Detector` to classify incoming sensor data as normal or anomalous. The `Sensor Simulator` uses these values to generate data that deliberately triggers these anomaly conditions, facilitating testing and demonstration.
 

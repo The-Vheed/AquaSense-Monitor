@@ -11,7 +11,7 @@ import httpx
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from common.config import Config
-from common.models import Anomaly, LLMSummary, HealthStatus, SensorReading
+from common.models import Anomaly, AnomalySummary, HealthStatus, SensorReading
 from summarizer import LLMSummarizer  # Import the LLMSummarizer class
 
 app = FastAPI(
@@ -125,23 +125,29 @@ async def get_recent_anomalies():
         )
 
 
-@app.get("/summary", response_model=LLMSummary)
+@app.get(
+    "/summary", response_model=AnomalySummary
+)  # Change response_model to AnomalySummary
 async def get_latest_summary():
     """
-    Generates a summary for a given list of anomalies using the LLM.
-    If no anomalies are provided, it will summarize the current recent anomalies.
+    Generates a structured summary of recent anomalies using the LLM.
     """
     # Fetch recent anomalies from the detector
     anomalies = await get_recent_anomalies()
 
-    llm_status, summary_text = await llm_summarizer_instance.generate_summary(
-        anomalies
-    )  # Await the async call
+    # Call the updated generate_summary method
+    success, summary_output = await llm_summarizer_instance.generate_summary(anomalies)
 
     # Update last summary generated timestamp for health check purposes
     health_status_data["last_summary_generated"] = datetime.now(timezone.utc)
 
-    return LLMSummary(timestamp=datetime.now(timezone.utc), summary_text=summary_text)
+    if success:
+        return summary_output
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate anomaly summary: {summary_output}",
+        )
 
 
 @app.get("/status", response_model=HealthStatus)

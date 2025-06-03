@@ -42,7 +42,8 @@ class Config:
     FLOW_DRIFT_THRESHOLD_LOW: float = FLOW_NORMAL_MIN
 
     # Dropout Detection: No data received for a sensor for more than X seconds
-    DROPOUT_THRESHOLD_SECONDS: int = 5  # If no data for 10 seconds
+    DROPOUT_THRESHOLD_SECONDS: int = 10  # If no data for 10 seconds
+    DROPOUT_CHECK_INTERVAL_SECONDS = 2
 
     # --- Anomaly Storage and Retention ---
     MAX_ANOMALIES_TO_STORE: int = 100  # Max number of recent anomalies (size-based)
@@ -62,6 +63,8 @@ class Config:
 
     SENSOR_SIMULATOR_HOST: str = "sensor_simulator"  # Service name in docker-compose
     SENSOR_SIMULATOR_PORT: int = 8002
+
+    HTTP_REQUEST_TIMEOUT_SECONDS = 10
 
     API_SERVICE_PORT: int = 8000
 

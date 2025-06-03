@@ -204,17 +204,17 @@ def detect_drift(reading: SensorReading) -> Optional[List[Anomaly]]:
     return anomalies if anomalies else None
 
 
-def detect_dropout(reading: SensorReading) -> Optional[List[Anomaly]]:
-    """Detects dropout anomalies if no data is received for a sensor."""
-    current_time = reading.timestamp
+def detect_dropout() -> Optional[List[Anomaly]]:
+    """
+    Detects dropout anomalies if no data is received for a sensor within the threshold.
+    This function is now called periodically by a background task.
+    """
+    current_time = datetime.now(timezone.utc)
     dropout_anomalies = []
 
+    # Iterate through all known sensors and check their last reading timestamp
     for sensor_id, last_ts in last_reading_timestamps.items():
-        if (
-            sensor_id == reading.sensor_id
-            and (current_time - last_ts).total_seconds()
-            > Config.DROPOUT_THRESHOLD_SECONDS
-        ):
+        if (current_time - last_ts).total_seconds() > Config.DROPOUT_THRESHOLD_SECONDS:
             dropout_anomalies.append(
                 Anomaly(
                     type="dropout",
@@ -224,10 +224,6 @@ def detect_dropout(reading: SensorReading) -> Optional[List[Anomaly]]:
                     message=f"Dropout detected for sensor '{sensor_id}': No data received for more than {Config.DROPOUT_THRESHOLD_SECONDS} seconds.",
                 )
             )
-
-    # Update last reading timestamp for the current sensor
-    last_reading_timestamps[reading.sensor_id] = reading.timestamp
-
     return dropout_anomalies if dropout_anomalies else None
 
 
@@ -267,6 +263,24 @@ async def cleanup_old_anomalies():
             print(
                 f"Cleaned up {removed_count} old anomalies. Remaining: {len(recent_anomalies)}"
             )
+
+
+async def periodic_dropout_check():
+    """
+    Background task to periodically check for dropout anomalies across all sensors.
+    """
+    while True:
+        await asyncio.sleep(Config.DROPOUT_CHECK_INTERVAL_SECONDS)
+
+        # Check for dropouts
+        dropout_anomalies = detect_dropout()
+        if dropout_anomalies:
+            for anomaly in dropout_anomalies:
+                recent_anomalies.append(anomaly)
+                print(
+                    f"ANOMALY DETECTED: {anomaly.message} ({anomaly.type}) at {anomaly.timestamp}"
+                )
+            await write_anomalies_to_file()
 
 
 # - FastAPI Endpoints
@@ -318,6 +332,9 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(cleanup_old_anomalies())
     print("Anomaly Detector: Started background anomaly cleanup task.")
 
+    asyncio.create_task(periodic_dropout_check())
+    print("Anomaly Detector: Started background periodic dropout check task.")
+
     yield
     print("Anomaly Detector FastAPI app shutting down.")
 
@@ -335,6 +352,9 @@ async def receive_sensor_data(
     Receives sensor data, performs anomaly detection, and updates internal state.
     """
 
+    # Update last reading timestamp for the current sensor FIRST
+    last_reading_timestamps[reading.sensor_id] = reading.timestamp
+
     # Detect anomalies
     detected_anomalies: List[Anomaly] = []
 
@@ -348,10 +368,8 @@ async def receive_sensor_data(
     if drift_anomalies:
         detected_anomalies.extend(drift_anomalies)
 
-    # Dropout detection - This now takes 'reading' to update its own last_reading_timestamps
-    dropout_anomalies = detect_dropout(reading)
-    if dropout_anomalies:
-        detected_anomalies.extend(dropout_anomalies)
+    # Dropout detection is now handled by a separate background task.
+    # No direct call to detect_dropout here.
 
     # Add detected anomalies to the recent_anomalies deque
     for anomaly in detected_anomalies:

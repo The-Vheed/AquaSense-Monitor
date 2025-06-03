@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import httpx
 import random
 from datetime import datetime, timezone
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI
 import uvicorn
 import os
 import sys
@@ -13,7 +13,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from common.config import Config
-from common.models import SensorReading, HealthStatus
+from common.models import SensorReading
 
 app = FastAPI(
     title="AquaSense Sensor Simulator",
@@ -28,19 +28,47 @@ health_status_data = {
     "target_detector_url": f"http://{Config.ANOMALY_DETECTOR_HOST}:{Config.ANOMALY_DETECTOR_PORT}/data",
 }
 
+# Global httpx client to reuse connections
+http_client = httpx.AsyncClient()
+
+
+async def send_sensor_reading(reading: SensorReading):
+    """
+    Asynchronously sends a single sensor reading to the anomaly detector.
+    Handles network errors and updates global health status.
+    """
+
+    # Print errors to prevent crashing sensor simulation upon anomaly server downtime
+    try:
+        response = await http_client.post(
+            health_status_data["target_detector_url"],
+            json=reading.model_dump(mode="json"),
+            timeout=Config.HTTP_REQUEST_TIMEOUT_SECONDS,  # Add a timeout to prevent indefinite blocking
+        )
+        response.raise_for_status()  # Raise an exception for bad status codes
+        print(f"Successfully sent reading: {reading.model_dump_json()}")
+        health_status_data["last_data_sent"] = datetime.now(timezone.utc)
+
+    except httpx.RequestError as e:
+        print(f"Error sending data to Anomaly Detector API (Request Error): {e}")
+    except httpx.HTTPStatusError as e:
+        print(
+            f"Anomaly Detector API returned error status {e.response.status_code}: {e.response.text}"
+        )
+    except Exception as e:
+        print(f"An unexpected error occurred while sending data: {e}")
+
 
 async def generate_and_send_data_task():
     """
-    Generates simulated sensor data and sends it to the anomaly_detector's API.
-    This function also introduces anomalies periodically for testing purposes.
-    Runs as a background task within the FastAPI app.
+    Generates simulated sensor data and schedules its sending to the Anomaly Detector.
+    This function now uses asyncio.create_task to make sending non-blocking.
     """
     print(f"Sensor Simulator starting for sensor: {Config.SENSOR_ID}")
     print(
         f"Sending data every {Config.READING_INTERVAL_SECONDS} seconds to {health_status_data['target_detector_url']}"
     )
 
-    client = httpx.AsyncClient()
     counter = 0
 
     while True:
@@ -67,7 +95,7 @@ async def generate_and_send_data_task():
             print("--- INTRODUCING DROPOUT ANOMALY (Skipping data for 11s) ---")
             for _ in range(int(11 / Config.READING_INTERVAL_SECONDS)):
                 await asyncio.sleep(Config.READING_INTERVAL_SECONDS)  # Simulate no data
-            counter += 1
+            counter += 1  # Increment counter for the skipped intervals
             continue  # Skip sending this reading to trigger dropout
         elif counter % 10 == 0 and counter != 0:  # Every 20 seconds (20 * 2s) - Spike
             print("--- INTRODUCING SPIKE ANOMALY ---")
@@ -96,23 +124,10 @@ async def generate_and_send_data_task():
             flow=flow,
         )
 
-        try:
-            # Send data to the anomaly_detector's /data endpoint
-            response = await client.post(
-                health_status_data["target_detector_url"],
-                json=reading.model_dump(mode="json"),
-            )
-            response.raise_for_status()  # Raise an exception for bad status codes
-            print(f"Sent reading: {reading.model_dump_json()}")
-            health_status_data["last_data_sent"] = datetime.now(
-                timezone.utc
-            )  # Update last sent timestamp
-        except httpx.RequestError as e:
-            print(f"Error sending data to Anomaly Detector API: {e}")
-        except httpx.HTTPStatusError as e:
-            print(
-                f"Anomaly Detector API returned error status {e.response.status_code}: {e.response.text}"
-            )
+        # Schedule the sending of the reading as a non-blocking task
+        # This allows the loop to immediately proceed to the next sleep.
+        asyncio.create_task(send_sensor_reading(reading))
+        print(f"Scheduled sending of reading for timestamp: {reading.timestamp}")
 
         await asyncio.sleep(Config.READING_INTERVAL_SECONDS)
         counter += 1
@@ -122,12 +137,16 @@ async def generate_and_send_data_task():
 async def lifespan(app: FastAPI):
     """
     FastAPI Lifecycle event to start the background data generation task.
+    Ensures HTTP client is closed on shutdown.
     """
     print("Sensor Simulator FastAPI app starting up...")
     # Start the data generation in a background task
     asyncio.create_task(generate_and_send_data_task())
     yield
     print("Sensor Simulator FastAPI app shutting down...")
+    # Close the HTTP client when the app shuts down
+    await http_client.aclose()
+    print("HTTP client closed.")
 
 
 app.router.lifespan_context = lifespan
