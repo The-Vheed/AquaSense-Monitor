@@ -45,20 +45,16 @@ class AnomalySummary(BaseModel):
 
     overall_status: str = Field(
         ...,
-        description="Overall operational status based on anomalies (e.g., 'Normal', 'Minor Issues', 'Critical').",
+        description="Overall operational status based on anomalies (e.g., 'Major', 'Minor', 'Critical').",
     )
     summary_message: str = Field(
         ...,
         description="A concise, human-readable summary message about the anomalies.",
     )
-    critical_anomalies_count: int = Field(
+    anomalies_count: int = Field(
         ...,
-        description="Number of critical anomalies detected (e.g., severe spikes, prolonged dropouts).",
+        description="Total number of anomalies detected (e.g., spikes, drifts, dropouts).",
     )
-    drift_counts: int = Field(
-        ..., description="Number of drift anomalies indicating sustained deviations."
-    )
-    dropout_issues: int = Field(..., description="Number of sensor dropout anomalies.")
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Timestamp when the summary was generated.",

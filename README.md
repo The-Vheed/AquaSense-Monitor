@@ -132,23 +132,25 @@ The anomaly detection in this system is primarily rule-based, defined by thresho
 
 These thresholds are used by the `Anomaly Detector` to classify incoming sensor data as normal or anomalous. The `Sensor Simulator` uses these values to generate data that deliberately triggers these anomaly conditions, facilitating testing and demonstration.
 
-## 5\. LangChain and LLM Integration
+## 5. LangChain and LLM Integration for Advanced Anomaly Summarization
 
-The system integrates a Large Language Model (LLM) for summarizing detected anomalies, making the insights more human-readable and actionable.
+The system incorporates a Large Language Model (LLM) to provide intelligent, structured, and human-readable summaries of detected anomalies, transforming raw data points into actionable insights.
 
-  * **LLM Provider:** [Ollama](https://ollama.ai/) is used as the local LLM server, hosting the `mistral` model.
-  * **Framework:** [LangChain](https://www.langchain.com/) is employed within the `LLMSummarizer` class to interact with Ollama. LangChain simplifies the process of building LLM-powered applications by providing abstractions for prompts, chains, and model interactions.
-  * **`LLMSummarizer` Class:**
-      * Located in `llm_summarizer/summarizer.py`.
-      * Initializes a `ChatOllama` client and a `PromptTemplate`.
-      * The `PromptTemplate` is designed to instruct the LLM to analyze a list of anomalies and provide a concise summary, focusing on important events and their impact.
-      * The `generate_summary` method takes a list of `Anomaly` objects, formats them into a string, and sends them to the LLM via a LangChain `LLMChain` for summarization.
-  * **Integration in API Service:**
-      * An instance of `LLMSummarizer` is initialized globally within `api_service/app.py`.
-      * The `/summarize` endpoint in the `API Service` directly calls this `LLMSummarizer` instance to generate summaries on demand, either for provided anomalies or for the latest anomalies fetched from the `Anomaly Detector`.
-      * The `/status` endpoint also uses `LLMSummarizer` to perform a health check by attempting to summarize an empty list of anomalies.
-
-This integration allows the system to not only detect anomalies but also to provide intelligent, contextual summaries, enhancing the system's utility for monitoring water quality.
+* **LLM Provider:** [Ollama](https://ollama.ai/) serves as the local LLM server, specifically hosting the `mistral` model (configurable). This allows for powerful local inference without reliance on external cloud services.
+* **Framework:** [LangChain](https://www.langchain.com/) is extensively utilized within the `LLMSummarizer` class to orchestrate interactions with Ollama. LangChain's abstractions for prompts, chains, and model interactions simplify the development of complex LLM-powered features.
+* **`LLMSummarizer` Class (`llm_summarizer/summarizer.py`):**
+    * **Initialization:** Sets up a `ChatOllama` client for communication with the local LLM. Includes robust error handling to ensure the LLM chain is only active if the connection is successful.
+    * **Enhanced Prompt Engineering:** Employs a sophisticated `PromptTemplate` that provides the LLM with detailed instructions for its role as an expert system for a water treatment facility. This prompt guides the LLM to:
+        * Determine an **overall operational status** (e.g., 'Normal', 'Critical').
+        * Generate a **concise summary message** highlighting significant issues.
+        * Quantify specific anomaly types (critical spikes, drift warnings, dropouts).
+    * **Structured Output with Pydantic:** Integrates a `PydanticOutputParser` to enforce a predefined `AnomalySummary` schema for the LLM's output. This ensures that the generated summary is consistently structured, making it programmatically consumable by other services.
+    * **`generate_summary` Method:** Takes a list of `Anomaly` objects, formats them (using Pydantic's `model_dump_json` for consistency), and sends them through a LangChain pipeline (`PromptTemplate | LLM | PydanticOutputParser`). It returns a `Tuple[bool, AnomalySummary | str]`, providing the structured summary on success or an error message if parsing or generation fails.
+    * **Robust Status Check (`check_llm_status`):** A dedicated method for quickly verifying LLM responsiveness and connectivity, essential for system health monitoring.
+* **Integration in API Service (`api_service/app.py`):**
+    * An instance of `LLMSummarizer` is initialized during the API service's startup.
+    * The `/summary` endpoint in the `API Service` now directly calls `llm_summarizer_instance.generate_summary`. This endpoint expects and returns the **structured `AnomalySummary` object**, allowing frontend applications or other services to easily display and act upon the detailed insights.
+    * The `/status` endpoint of the `API Service` leverages `LLMSummarizer` to perform a health check of the underlying LLM service.
 
 ## 6\. API Documentation
 
@@ -199,8 +201,10 @@ The `API Service` exposes several endpoints for interacting with the system. Onc
     * **Response Format (Status Code: 200 OK):**
         ```json
         {
-            "timestamp": "2025-05-28T15:40:00Z",
-            "summary_text": "In the last hour, two anomalies were detected: a temperature spike on sensor_001 and a pressure drift on sensor_002. Overall system health appears stable despite these isolated incidents."
+            "overall_status": "Critical",
+            "summary_message": "Critical anomalies detected: 2 dropout events (15:12:54, 15:14:22), 14 temperature spikes (highest 46.83°C at 15:13:13), 4 drift warnings (sustained >35.0°C).",
+            "anomalies_count": 20,
+            "timestamp": "2025-06-05T15:15:30Z"
         }
         ```
     * **Description:** Retrieves the latest summary generated by the LLM. Note that summaries are generated on-demand and are not persistently stored by the API service.

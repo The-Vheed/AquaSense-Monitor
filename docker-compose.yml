@@ -41,7 +41,7 @@ services:
       dockerfile: sensor_simulator/Dockerfile
     container_name: aqua-sense-sensor-simulator
     ports:
-      - "8002:8002" # Expose sensor simulator's API port (8000 inside container, 8002 on host)
+      - "8002:8002" # Expose sensor simulator's API port
     depends_on:
       anomaly_detector:
         condition: service_healthy # Wait for detector to be ready

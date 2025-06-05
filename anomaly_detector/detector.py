@@ -250,7 +250,6 @@ async def cleanup_old_anomalies():
     Background task to periodically remove anomalies older than ANOMALY_RETENTION_SECONDS.
     """
     while True:
-        await asyncio.sleep(Config.ANOMALY_CLEANUP_INTERVAL_SECONDS)
         current_time = datetime.now(timezone.utc)
         cutoff_time = current_time - timedelta(seconds=Config.ANOMALY_RETENTION_SECONDS)
 
@@ -263,6 +262,8 @@ async def cleanup_old_anomalies():
             print(
                 f"Cleaned up {removed_count} old anomalies. Remaining: {len(recent_anomalies)}"
             )
+        await write_anomalies_to_file()
+        await asyncio.sleep(Config.ANOMALY_CLEANUP_INTERVAL_SECONDS)
 
 
 async def periodic_dropout_check():
