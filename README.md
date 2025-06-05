@@ -109,7 +109,7 @@ Before you begin, ensure you have the following installed:
       * `--build`: This flag ensures that Docker builds the images for your custom services (Anomaly Detector, Sensor Simulator, API Service) from their respective Dockerfiles.
       * `-d`: Runs the containers in detached mode (in the background).
 
-    **Note:** The first time you run this, Ollama will automatically download the `mistral` LLM, which can take a significant amount of time depending on your internet connection (the model is several gigabytes). You will see output from the `ollama` container indicating the download progress.
+    **Note:** The first time you run this, Ollama will automatically download the `mistral` LLM in the background, which can take a significant amount of time depending on your internet connection (the model is several gigabytes). You will see output logs from the `ollama` container indicating the download progress. Until the download is finished, only the `/summary` endpoint would be inactive until the download is complete
 
 4.  **Verify Services are Running:**
     You can check the status of your running containers:
